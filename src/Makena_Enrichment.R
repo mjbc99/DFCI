@@ -1,5 +1,5 @@
-setwd("~/Desktop/presentation")
-source("sup.moa2.R")
+
+#source("sup.moa2.R")
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(readr))
 suppressPackageStartupMessages(library(Biobase))
@@ -155,28 +155,30 @@ gs.annots = buildIdx(entrezIDs=rownames(v$E), species="human",
 gs.annots= buildMSigDBIdx(rownames(v$E), geneSets = "all", species = "Homo sapiens", min.size = 5, rdata.dir = NULL)
 gs.annots<-gs.annots[c("c6", "c7")]
 
-res<-egsea(v, makeContrasts(ILC = DiagnosisILC-TumFacmed -TumFachigh, levels=v$design), gs.annots=gs.annots, baseGSEAs=c("globaltest"))
+v$genes= cbind(FeatureID = as.character(entID), Symbols=names(entID))
+
+res2<-egsea(v, makeContrasts(ILC = DiagnosisILC-TumFacmed -TumFachigh, levels=v$design), symbolsMap=v$genes,gs.annots=gs.annots, baseGSEAs=c("globaltest"),display.top = 100, sort.by="avg.rank",egsea.dir="./EGSEA_MSigDB-report)
 
 
-# Requie Globaltest
-require(globaltest)
-p.value(gt(normSet, Y= PT, genesets=geneset, sampling=TRUE))
-
-## GSEA
-#GSEA_immune <- sbea(method = "gsea", eset = diffexp, gs = msigdb_immune_gs, alpha = 0.05)
-#GSEA_genesig <- sbea(method = "gsea", eset = diffexp, gs = genesigdb_gs, alpha = 0.05)
-GSEA_bindea <- sbea(method = "gsea", eset = diffexp, gs = bindea_gs, alpha = 0.05)
-GSEA_immune <- readRDS("GSEA_immune.rds")
-GSEA_genesig <- readRDS("GSEA_genesig.rds")
-GSEA_bindea <- readRDS(file.path(datadir,"GSEA_bindea.rds"))
-
-
-#### gs ranking
-#gs.ranks.bindea <- gs.ranking(GSEA_bindea)
-gs.ranks.bindea <- readRDS("bindea_sig_df.rds")
-gs.ranks.genesig <- readRDS("genesig_sig_df.rds")
-gs.ranks.immune <- readRDS("immune_sig_df.rds")
-
-
-# Make Heatmaps
+# # Requie Globaltest
+# require(globaltest)
+# p.value(gt(normSet, Y= PT, genesets=geneset, sampling=TRUE))
 #
+# ## GSEA
+# #GSEA_immune <- sbea(method = "gsea", eset = diffexp, gs = msigdb_immune_gs, alpha = 0.05)
+# #GSEA_genesig <- sbea(method = "gsea", eset = diffexp, gs = genesigdb_gs, alpha = 0.05)
+# GSEA_bindea <- sbea(method = "gsea", eset = diffexp, gs = bindea_gs, alpha = 0.05)
+# GSEA_immune <- readRDS("GSEA_immune.rds")
+# GSEA_genesig <- readRDS("GSEA_genesig.rds")
+# GSEA_bindea <- readRDS(file.path(datadir,"GSEA_bindea.rds"))
+#
+#
+# #### gs ranking
+# #gs.ranks.bindea <- gs.ranking(GSEA_bindea)
+# gs.ranks.bindea <- readRDS("bindea_sig_df.rds")
+# gs.ranks.genesig <- readRDS("genesig_sig_df.rds")
+# gs.ranks.immune <- readRDS("immune_sig_df.rds")
+#
+#
+# # Make Heatmaps
+# #
