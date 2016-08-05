@@ -8,6 +8,11 @@ suppressPackageStartupMessages(library(hgu95av2))
 suppressPackageStartupMessages(library(ComplexHeatmap))
 
 
+#setwd("~/Desktop/presentation")
+wkdir ="~/git_src/Makena/"
+srcdir= file.path(wkdir, "src")
+datadir = file.path(wkdir, "data")
+
 ## Files To be Read
 
 ### Read in Normalized RNA Seq
@@ -147,18 +152,42 @@ eset$TumFac<-factor(cut(eset$percent_tumor_cells,3), labels=c("low", "med", "hig
 m=model.matrix(~ Diagnosis + TumFac, pData(eset) )
 v= voom(eset,design=m)
 
+#################
+# Map Bindea GS
+##################
+#1. Map Symbols to EntrezGene IDs
+bindea_gsENTREZ<-lapply(bindea_gs, function(x) as.character(mapIds(org.Hs.eg.db, keys= x,  keytype="SYMBOL",column="ENTREZID")))
+
+#2. Build Index.
+gs.bindea<-buildCustomIdx(rownames(v$E), bindea_gsENTREZ, anno = NULL, label = "bindea_gs",name = "Bindea Gene Sets", species = "Human", min.size = 3)
 
 
+#################
+# GeneSIgDB
+################
+genesigdb_Entrez<-GSEABase::getGmt(file.path(datadir, "GENESIGDBv4Entrez.gmt"), geneIdType=EntrezIdentifier())
+
+
+
+######
+## Build Index
+####
 gs.annots = buildIdx(entrezIDs=rownames(v$E), species="human",
                      msigdb.gsets="none",
                      kegg.updated=FALSE, kegg.exclude = "all")
 gs.annots= buildMSigDBIdx(rownames(v$E), geneSets = "all", species = "Homo sapiens", min.size = 5, rdata.dir = NULL)
 gs.annots<-gs.annots[c("c6", "c7")]
 
-v$genes= cbind(FeatureID = as.character(entID), Symbols=names(entID))
+v$genes= data.frame(cbind(FeatureID = as.character(entID), Symbols=names(entID)))
 
-res2<-egsea(v, makeContrasts(ILC = DiagnosisILC-TumFacmed -TumFachigh, levels=v$design), symbolsMap=v$genes,gs.annots=gs.annots, baseGSEAs=c("globaltest"),display.top = 100, sort.by="avg.rank",egsea.dir="./EGSEA_MSigDB-report)
 
+res2<-egsea(v, makeContrasts(ILC = DiagnosisILC-TumFacmed -TumFachigh, levels=v$design), symbolsMap=v$genes,gs.annots=gs.annots[[1]], baseGSEAs=c("globaltest"),display.top = 100, sort.by="avg.rank",egsea.dir="./EGSEA_MSigDB-report")
+
+
+# Get per tumor gene set scores
+# For this we will use gsva.
+# I had hope these scores would be provided by egsea but I can't see any argument to permit this
+gene_set_surivival_analysis<-function(){}
 
 # # Requie Globaltest
 # require(globaltest)
