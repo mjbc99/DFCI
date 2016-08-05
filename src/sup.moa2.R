@@ -1,4 +1,4 @@
-sup.moa2 <- function (X, sup, nf = 2, ks.stat = FALSE, ks.B = 1000, ks.cores = NULL) 
+sup.moa2 <- function (X, sup, nf = 2, ks.stat = FALSE, ks.B = 1000, ks.cores = NULL)
 {
   N <- length(sup)
   fs <- X@fac.scr
@@ -7,17 +7,17 @@ sup.moa2 <- function (X, sup, nf = 2, ks.stat = FALSE, ks.B = 1000, ks.cores = N
   load <- split(X@loading, f = rep(nn, repr))
   load <- load[nn]
   w <- rowSums(sapply(sup, colSums))
-  if (any(w == 0)) 
+  if (any(w == 0))
     stop("unrelated pathways involved")
   normsup <- sup
-  GSCoordinate_sep <- mapply(SIMPLIFY = FALSE, function(load, 
+  GSCoordinate_sep <- mapply(SIMPLIFY = FALSE, function(load,
                                                         sup, A) {
     a <- t(sup * A) %*% as.matrix(load[, 1:nf, drop = FALSE])
     colnames(a) <- paste("PC", 1:nf, sep = "")
     return(a)
   }, load = load, sup = normsup, A = split(X@w.data, names(X@w.data))[nn])
   GSCoordinate_comb <- Reduce("+", GSCoordinate_sep)
-  contribution <- lapply(GSCoordinate_sep, function(supcor, 
+  contribution <- lapply(GSCoordinate_sep, function(supcor,
                                                     score) {
     a <- lapply(1:nf, function(i) {
       r <- outer(supcor[, i], score[, i])
@@ -39,30 +39,30 @@ sup.moa2 <- function (X, sup, nf = 2, ks.stat = FALSE, ks.B = 1000, ks.cores = N
   contribution_total <- Reduce("+", contribution_dataset)
   csup <- do.call("rbind", sup)
   if (!ks.stat) {
-    pmat <- .signifGS(X = X, sup = csup, A = X@w.data, score = contribution_total, 
+    pmat <- .signifGS(X = X, sup = csup, A = X@w.data, score = contribution_total,
                       nf = nf)
     attr(pmat, "method") <- "zscore"
   }
   else {
-    if (is.null(ks.cores)) 
+    if (is.null(ks.cores))
       ks.cores <- getOption("mc.cores", 2L)
     cat("running bootstrapping for p values of KS.stat ...\n")
-    pmat <- .ks.pval(X, sup, ks.B = ks.B, A = X@w.data, nf = nf, 
+    pmat <- .ks.pval(X, sup, ks.B = ks.B, A = X@w.data, nf = nf,
                      mc.cores = ks.cores)
     attr(pmat, "method") <- "KS.stat"
   }
-  res <- new("moa.sup", sup = sup, coord.comb = GSCoordinate_comb, 
-             coord.sep = GSCoordinate_sep, score = contribution_total, 
-             score.data = contribution_dataset, score.pc = contribution_pc, 
+  res <- new("moa.sup", sup = sup, coord.comb = GSCoordinate_comb,
+             coord.sep = GSCoordinate_sep, score = contribution_total,
+             score.data = contribution_dataset, score.pc = contribution_pc,
              score.sep = contribution, p.val = pmat)
   return(res)
 }
 
 .signifGS <- function(X, sup, A, score, nf) {
-  
-  # define function 
+
+  # define function
   ff <- function(x, n, score, infinite=FALSE) {
-    lx <- length(x) 
+    lx <- length(x)
     if (infinite)
       sf <- 1 else
         sf <- sqrt((lx-n)/(lx-1))
@@ -72,7 +72,7 @@ sup.moa2 <- function (X, sup, nf = 2, ks.stat = FALSE, ks.B = 1000, ks.cores = N
       2 * Biobase::rowMin(cbind(pp, 1-pp))
   }
   # reconstuct matrix using nf PCs
-  U <- as.matrix(X@loading[, 1:nf, drop=FALSE]) 
+  U <- as.matrix(X@loading[, 1:nf, drop=FALSE])
   D <- diag(sqrt(X@eig[1:nf]), nrow = nf)
   V <- as.matrix(X@eig.vec[, 1:nf, drop=FALSE])
   rec <- (U %*% D %*% t(V)) * A
@@ -111,17 +111,30 @@ makemgsa2 <- function(mfa, sup)
   return(c(moa=mfa, sup=sup))
 }
 
-getmgsa2 <- function (mgsa, value) 
+getmgsa2 <- function (mgsa, value)
 {
-  if (value %in% c("call", "moa", "sup")) 
+  if (value %in% c("call", "moa", "sup"))
     r <- slot(mgsa, value)
-  else if (value %in% c("eig", "tau", "partial.eig", "eig.vec", 
-                        "loading", "fac.scr", "partial.fs", "ctr.obs", "ctr.var", 
-                        "ctr.tab", "RV")) 
+  else if (value %in% c("eig", "tau", "partial.eig", "eig.vec",
+                        "loading", "fac.scr", "partial.fs", "ctr.obs", "ctr.var",
+                        "ctr.tab", "RV"))
     r <- slot(mgsa@moa, value)
-  else if (value %in% c("data", "coord.sep", "coord.comb", 
-                        "score", "score.data", "score.pc", "score.sep", "p.val")) 
+  else if (value %in% c("data", "coord.sep", "coord.comb",
+                        "score", "score.data", "score.pc", "score.sep", "p.val"))
     r <- slot(mgsa@sup, value)
   else stop("unknown value selected.")
   return(r)
 }
+
+
+makeEset<-function(eSet, annt){
+  metadata <- data.frame(labelDescription = colnames(annt), row.names=colnames(annt))
+  phenoData<-new("AnnotatedDataFrame", data=annt, varMetadata=metadata)
+  # pData(eSet) = pData(phenoData)
+  if (inherits(eSet, "data.frame")) eSet= as.matrix(eSet)
+  if (inherits(eSet, "ExpressionSet")) eSet=exprs(eSet)
+  data.eSet<-new("ExpressionSet", exprs=eSet, phenoData=phenoData)
+  print(varLabels(data.eSet))
+  return(data.eSet)
+}
+

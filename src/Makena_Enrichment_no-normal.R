@@ -1,5 +1,15 @@
-setwd("~/Desktop/presentation")
-source("sup.moa2.R")
+####################
+#  Script by Makena and Azfar
+#  July 2016
+######################
+
+#setwd("~/Desktop/presentation")
+wkdir ="~/git_src/Makena"
+srcdir= file.path(wkdir, "src")
+datadir = file.path(wkdir, "data")
+
+## Load Libraries
+source(file.path(srcdir,"sup.moa2.R"))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(readr))
 suppressPackageStartupMessages(library(Biobase))
@@ -102,12 +112,12 @@ gs.ranks.immune.pre <- readRDS("immune_sig_df_before.rds")
 #saveRDS(variable_name, "file_name.rds")
 #first col (gene sig names), venn diagram venn(,) --> Limma & setdiff()
 
-results <- 
+results <-
 limma::vennDiagram(results, include = c())
 
 
-#gs ranking comparison 
+#gs ranking comparison
 
 
 # Make Heatmaps
-# 
+#
