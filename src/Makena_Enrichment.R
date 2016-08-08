@@ -40,6 +40,28 @@ msigdb_immune_gs <- parse.genesets.from.GMT(msigdb_immune_filepath)
 genesigdb_gs <- parse.genesets.from.GMT(genesigdb_filepath)
 
 
+## CLinical annotation (Ignore)
+makeAnnot<-function(ExprSet=ExprSet) {
+  annot <- readRDS(file.path(datadir,"Makena_clinical_table.rds"))
+  annot<-merge(pData(ExprSet), annot)
+
+
+  clin<-read.table(file.path(datadir, "BRCA.clin.merged.picked.txt"), sep="\t", header = TRUE,as.is=TRUE)
+  clin<-t(clin)
+  colnames(clin) = clin[1,]
+  clin<-clin[-1,]
+  clin<-clin[,!colnames(clin)%in%"Composite Element REF"]
+  rownames(clin)<-toupper(gsub("\\.", "-", rownames(clin)))
+  annot<-cbind(annot,clin[annot$sample,])
+  #annot[,grep("days", colnames(annot))][1:5,]
+  annot$days_to_last_followup<-as.numeric(as.character(annot$days_to_last_followup))
+  annot$days_to_death<-as.numeric(as.character(annot$days_to_death))
+  annot$TIME<-annot$days_to_last_followup
+  annot$TIME[which(is.na(annot$TIME))]<-annot$days_to_death[which(is.na(annot$TIME))]
+  #cbind(annot$TIME,annot[,grep("days", colnames(annot))])[1:5,]
+}
+
+
 ### Diagnosis
 ###############################
 ## Depreciated Code
@@ -92,13 +114,8 @@ ExprSet <- readRDS(file.path(datadir, "ExprSet.rds"))  # Expression Set
 
 normSet<-  as.data.frame(voom(ExprSet)$E)
 
-annot <- readRDS(file.path(datadir,"Makena_clinical_table.rds"))
-annot<-merge(pData(ExprSet), annot)
-rownames(annot) = annot$colname
-#table(rownames(annot)%in% colnames(normSet))
 annot<-annot[colnames(normSet),]
 identical(rownames(annot), colnames(normSet))
-
 
 normSet<-makeEset(normSet, annot)
 
@@ -126,7 +143,7 @@ lmRes<-eBayes(lmFit((normSet), model.matrix(~Diagnosis, data=pData(ExprSet) ) ))
 #ExprSet <- readRDS("ExprSet.rds")
 #diffexp <- readRDS(file.path(datadir,"BRCA_diffexp.rds"))
 
-normSet<-normSet[,!is.na(normSet$highTumorFac)]
+normSet <- normSet[,!is.na(normSet$highTumorFac)]
 lmRes <- eBayes(lmFit(normSet, model.matrix(~ Diagnosis + cut(percent_tumor_cells,3) , data = pData(normSet) ) ))
 
 summary(decideTests(lmRes, p.value=0.05,lfc=1))
@@ -236,19 +253,8 @@ bindea_gsva<-gsva(v$E, bindea_gsENTREZ, mx.diff=1)$es.obs
 # Clinical
 # downloaded from http://gdac.broadinstitute.org/runs/stddata__2016_01_28/data/BRCA/20160128/gdac.broadinstitute.org_BRCA.Clinical_Pick_Tier1.Level_4.2016012800.0.0.tar.gz
 
-clin<-read.table(file.path(datadir, "BRCA.clin.merged.picked.txt"), sep="\t", header = TRUE,as.is=TRUE)
-clin<-t(clin)
-colnames(clin) = clin[1,]
-clin<-clin[-1,]
-clin<-clin[,!colnames(clin)%in%"Composite Element REF"]
-rownames(clin)<-toupper(gsub("\\.", "-", rownames(clin)))
-annot<-cbind(annot,clin[annot$sample,])
-#annot[,grep("days", colnames(annot))][1:5,]
-annot$days_to_last_followup<-as.numeric(as.character(annot$days_to_last_followup))
-annot$days_to_death<-as.numeric(as.character(annot$days_to_death))
-annot$TIME<-annot$days_to_last_followup
-annot$TIME[which(is.na(annot$TIME))]<-annot$days_to_death[which(is.na(annot$TIME))]
-#cbind(annot$TIME,annot[,grep("days", colnames(annot))])[1:5,]
+annot- read.csv(file.path(datadir, file='updated_annot.csv'))
+
 
 print("Number of events")
 table(annot$vital_status, annot$Diagnosis)
@@ -258,13 +264,17 @@ table(annot$vital_status, annot$Diagnosis)
 
 plotKM(y=Surv(annot$TIME/365*12,annot$vital_status==1), strata=factor(annot$Diagnosis))
 
+survcomp::km.coxph.plot(Surv(TIME/365*12,vital_status==1)~factor(Diagnosis), data.s=annot,x.label="Time (months)", y.label="Probability of survival", main.title="",show.n.risk=TRUE, n.risk.step=10, n.risk.cex=.3)
+
 # Code to test genesets
 a<-annot[colnames(bindea_gsva),]
 bindea_surv<-list()
+
 bindea_surv$CoxPH_Models<-apply(bindea_gsva,1, function(x) coxph(Surv(annot[colnames(bindea_gsva),"TIME"]/365*12,as.character(annot[colnames(bindea_gsva),"vital_status"])==1)~x))
 
 bindea_surv$CoxPH_Summary<-sapply(bindea_surv$CoxPH_Models, broom::tidy)
 nsig= which(bindea_surv$CoxPH_Summary["p.value",]<0.05)
-bindea_surv$CoxPH_Summary[,]
-sapply(nsig,function(x) plotKMStratifyBy(y =Surv(annot[colnames(bindea_gsva),"TIME"]/365*12,as.character(annot[colnames(bindea_gsva),"vital_status"])==1),linearriskscore=bindea_gsva[x,], main=rownames(bindea_gsva)[x]))
+bindea_surv$CoxPH_Summary[,nsig]
+
+sapply(nsig,function(x) plotKMStratifyBy("median",y =Surv(annot[colnames(bindea_gsva),"TIME"]/365*12,as.character(annot[colnames(bindea_gsva),"vital_status"])==1),linearriskscore=bindea_gsva[x,], main=rownames(bindea_gsva)[x]))
 
