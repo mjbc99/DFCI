@@ -1,17 +1,22 @@
 
-#source("sup.moa2.R")
+
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(readr))
 suppressPackageStartupMessages(library(Biobase))
 suppressPackageStartupMessages(library(EnrichmentBrowser))
-suppressPackageStartupMessages(library(hgu95av2))
+#suppressPackageStartupMessages(library(hgu95av2))
 suppressPackageStartupMessages(library(ComplexHeatmap))
-
+suppressPackageStartupMessages(library(limma))
+suppressPackageStartupMessages(library(EGSEA))
+suppressPackageStartupMessages(library(survHD))
+suppressPackageStartupMessages(library(survival))
 
 #setwd("~/Desktop/presentation")
 wkdir ="~/git_src/Makena/"
 srcdir= file.path(wkdir, "src")
 datadir = file.path(wkdir, "data")
+
+source(file.path(srcdir,"sup.moa2.R"))
 
 ## Files To be Read
 
@@ -93,6 +98,8 @@ rownames(annot) = annot$colname
 #table(rownames(annot)%in% colnames(normSet))
 annot<-annot[colnames(normSet),]
 identical(rownames(annot), colnames(normSet))
+
+
 normSet<-makeEset(normSet, annot)
 
 normSet$highTumorFac<-factor(normSet$percent_tumor_cells>70)
@@ -211,3 +218,53 @@ gene_set_surivival_analysis<-function(){}
 #
 # # Make Heatmaps
 # #
+
+
+## limma
+
+#lmFit(v) -> lmRes
+#contrasts.fit(lmRes, makeContrasts(ILC = DiagnosisILC-TumFacmed -TumFachigh, levels=v$design))
+#topTable(eBayes(lmRes))
+
+# Use default baseGSEA
+bindea_egsea<-egsea(v, makeContrasts(ILC = DiagnosisILC-TumFacmed -TumFachigh, levels=v$design), symbolsMap=v$genes,gs.annots=gs.bindea,display.top = 100, sort.by="avg.rank",egsea.dir="./EGSEA_bindea-report")
+
+topSets(bindea_egsea,names.only=FALSE)
+require(GSVA)
+bindea_gsva<-gsva(v$E, bindea_gsENTREZ, mx.diff=1)$es.obs
+
+# Clinical
+# downloaded from http://gdac.broadinstitute.org/runs/stddata__2016_01_28/data/BRCA/20160128/gdac.broadinstitute.org_BRCA.Clinical_Pick_Tier1.Level_4.2016012800.0.0.tar.gz
+
+clin<-read.table(file.path(datadir, "BRCA.clin.merged.picked.txt"), sep="\t", header = TRUE,as.is=TRUE)
+clin<-t(clin)
+colnames(clin) = clin[1,]
+clin<-clin[-1,]
+clin<-clin[,!colnames(clin)%in%"Composite Element REF"]
+rownames(clin)<-toupper(gsub("\\.", "-", rownames(clin)))
+annot<-cbind(annot,clin[annot$sample,])
+#annot[,grep("days", colnames(annot))][1:5,]
+annot$days_to_last_followup<-as.numeric(as.character(annot$days_to_last_followup))
+annot$days_to_death<-as.numeric(as.character(annot$days_to_death))
+annot$TIME<-annot$days_to_last_followup
+annot$TIME[which(is.na(annot$TIME))]<-annot$days_to_death[which(is.na(annot$TIME))]
+#cbind(annot$TIME,annot[,grep("days", colnames(annot))])[1:5,]
+
+print("Number of events")
+table(annot$vital_status, annot$Diagnosis)
+
+
+# Survival in TCGA data, probably not enough
+
+plotKM(y=Surv(annot$TIME/365*12,annot$vital_status==1), strata=factor(annot$Diagnosis))
+
+# Code to test genesets
+a<-annot[colnames(bindea_gsva),]
+bindea_surv<-list()
+bindea_surv$CoxPH_Models<-apply(bindea_gsva,1, function(x) coxph(Surv(annot[colnames(bindea_gsva),"TIME"]/365*12,as.character(annot[colnames(bindea_gsva),"vital_status"])==1)~x))
+
+bindea_surv$CoxPH_Summary<-sapply(bindea_surv$CoxPH_Models, broom::tidy)
+nsig= which(bindea_surv$CoxPH_Summary["p.value",]<0.05)
+bindea_surv$CoxPH_Summary[,]
+sapply(nsig,function(x) plotKMStratifyBy(y =Surv(annot[colnames(bindea_gsva),"TIME"]/365*12,as.character(annot[colnames(bindea_gsva),"vital_status"])==1),linearriskscore=bindea_gsva[x,], main=rownames(bindea_gsva)[x]))
+
